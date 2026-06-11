@@ -7,7 +7,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <style>
-        /* আপনার দেওয়া CSS */
         #loadingScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #ff3838; text-align: center; padding: 20px; box-sizing: border-box; }
         .load-logo { font-size: 50px; font-weight: 900; font-style: italic; margin-bottom: 20px; }
         .load-bar-bg { width: 100%; max-width: 400px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
@@ -26,9 +25,12 @@
         #multiplierText { position: relative; z-index: 20; pointer-events: none; }
         .game-display::before { content: ""; position: absolute; top: 25px; right: 40px; width: 35px; height: 35px; background: #e0e0e0; border-radius: 50%; box-shadow: 0 0 15px #ffffff; clip-path: circle(50% at 65% 50%); z-index: 1; }
         .busted { color: #ff3838; }
-        #plane { position: absolute; font-size: 40px; z-index: 10; display: none; transition: left 0.1s linear, bottom 0.1s linear; transform: scaleX(1) rotate(-45deg); }
-        @keyframes float { 0% { transform: scaleX(1) rotate(-45deg) translateY(0px); } 50% { transform: scaleX(1) rotate(-45deg) translateY(-10px); } 100% { transform: scaleX(1) rotate(-45deg) translateY(0px); } }
+        
+        /* এখানে রোটেট (rotate) সরিয়ে দেওয়া হয়েছে যাতে বিমান সোজা থাকে */
+        #plane { position: absolute; z-index: 10; display: none; transition: left 0.1s linear, bottom 0.1s linear; width: 95px; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
         .floating { animation: float 2s ease-in-out infinite; }
+        
         #timerContainer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; justify-content: center; align-items: center; background: #000; z-index: 30; padding: 10px; box-sizing: border-box; }
         .u-logo { color: #ff3838; font-size: 28px; font-weight: bold; font-style: italic; margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
         .plane-icon { width: 30px; height: 30px; fill: #ff3838; transform: rotate(15deg); }
@@ -101,7 +103,7 @@
     <div class="game-display" id="display">
         <div id="cashOutContainer"></div>
         <div id="multiplierText">1.00x</div>
-        <div id="plane">🛩️</div> 
+        <img id="plane" src="https://i.ibb.co/RpLGkxwq/Untitled-June-11-2026-at-07-20-06.png"> 
         <div id="timerContainer">
             <div class="u-logo">
                 UFC 
@@ -171,7 +173,6 @@
     </div>
 
     <script>
-        // --- Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyDzX1M74cYgDj4w-ElFLdlXGYnDAz3CInE",
             authDomain: "my-aviator-game-5dd94.firebaseapp.com",
@@ -184,15 +185,10 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // সব গেম লজিক
         window.onload = () => { setTimeout(() => { document.getElementById('loadBar').style.width = '100%'; }, 100); setTimeout(() => { document.getElementById('loadingScreen').style.display = 'none'; startNewRound(); }, 4100); };
         let balance = 10000.00, gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet';
         
-        // --- প্রেডিকশন লজিক ---
-        function pushPrediction(val) {
-            db.ref('live_prediction').set({ next_crash: val.toFixed(2), status: 'ready', time: Date.now() });
-        }
-
+        function pushPrediction(val) { db.ref('live_prediction').set({ next_crash: val.toFixed(2), status: 'ready', time: Date.now() }); }
         function switchTab(type, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); let list = document.getElementById('listData'); list.innerHTML = ""; for(let i=0; i<8; i++) { list.innerHTML += `<div class="data-row"><span>User${Math.floor(Math.random()*9999)}</span><span>${(Math.random()*1000).toFixed(0)} BDT</span><span style="color:#4caf50">${(Math.random()*5+1).toFixed(2)}x</span></div>`; } }
         function showCashOut(m, w) { let container = document.getElementById('cashOutContainer'); let div = document.createElement('div'); div.className = 'cash-out-box'; div.innerHTML = `<div class="cash-text">You have cashed out!</div><div class="win-amount">${m.toFixed(2)}x | ${w.toFixed(2)} BDT</div>`; container.appendChild(div); setTimeout(() => { div.remove(); }, 2000); }
         function checkAutoCashOut() { if (bet1Status === 'active' && document.getElementById('autoSwitch1').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult1').value)) handleBet('betBtn1', 'amount1'); if (bet2Status === 'active' && document.getElementById('autoSwitch2').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult2').value)) handleBet('betBtn2', 'amount2'); }
@@ -207,24 +203,70 @@
         
         function startNewRound() {
             let targetMultiplier = getRandomResult();
-            pushPrediction(targetMultiplier); // এখানে প্রেডিকশন পাঠানো হচ্ছে
+            pushPrediction(targetMultiplier);
+            let plane = document.getElementById('plane'); 
+            let multiplierText = document.getElementById('multiplierText'); 
+            plane.classList.remove('floating'); 
+            plane.style.display = "block"; 
             
-            let plane = document.getElementById('plane'); let multiplierText = document.getElementById('multiplierText'); plane.classList.remove('floating'); plane.style.display = "block"; plane.textContent = "🛩️"; let posX = 10, posY = 10; plane.style.left = posX + "px"; plane.style.bottom = posY + "px"; let velX = 0.5, velY = 0.2, accel = 0.15; isRoundStarted = true; if (bet1Status === 'pending') { bet1Status = 'active'; document.getElementById('betBtn1').innerText = "CASH OUT"; document.getElementById('betBtn1').style.backgroundColor = "#eab92d"; } if (bet2Status === 'pending') { bet2Status = 'active'; document.getElementById('betBtn2').innerText = "CASH OUT"; document.getElementById('betBtn2').style.backgroundColor = "#eab92d"; }
-            let timerContainer = document.getElementById('timerContainer'); let timerProgress = document.getElementById('timerProgress'); multiplierText.textContent = "1.00x"; multiplierText.classList.remove('busted'); timerContainer.style.display = "none"; gameMultiplier = 1.00;
+            let posX = 10, posY = 10; 
+            plane.style.left = posX + "px"; 
+            plane.style.bottom = posY + "px"; 
+            let velX = 0.5, velY = 0.2, accel = 0.15; 
+            isRoundStarted = true; 
+            
+            if (bet1Status === 'pending') { bet1Status = 'active'; document.getElementById('betBtn1').innerText = "CASH OUT"; document.getElementById('betBtn1').style.backgroundColor = "#eab92d"; } 
+            if (bet2Status === 'pending') { bet2Status = 'active'; document.getElementById('betBtn2').innerText = "CASH OUT"; document.getElementById('betBtn2').style.backgroundColor = "#eab92d"; }
+            
+            let timerContainer = document.getElementById('timerContainer'); 
+            let timerProgress = document.getElementById('timerProgress'); 
+            multiplierText.textContent = "1.00x"; 
+            multiplierText.classList.remove('busted'); 
+            timerContainer.style.display = "none"; 
+            gameMultiplier = 1.00;
             
             gameInterval = setInterval(() => {
-                gameMultiplier += (gameMultiplier < 4) ? 0.01 : 0.03; multiplierText.textContent = gameMultiplier.toFixed(2) + "x"; checkAutoCashOut(); velX += accel * 0.1; velY += accel * 0.05; posX += velX; posY += velY; plane.style.left = Math.min(250, posX) + "px"; plane.style.bottom = Math.min(120, posY) + "px"; if (posX >= 250 || posY >= 120) plane.classList.add('floating');
-                if (bet1Status === 'active') document.getElementById('betBtn1').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount1').value) * gameMultiplier).toFixed(2) + "</span>"; if (bet2Status === 'active') document.getElementById('betBtn2').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount2').value) * gameMultiplier).toFixed(2) + "</span>";
+                gameMultiplier += (gameMultiplier < 4) ? 0.01 : 0.03; 
+                multiplierText.textContent = gameMultiplier.toFixed(2) + "x"; 
+                checkAutoCashOut(); 
+                velX += accel * 0.1; 
+                velY += accel * 0.05; 
+                posX += velX; 
+                posY += velY; 
+                plane.style.left = Math.min(250, posX) + "px"; 
+                plane.style.bottom = Math.min(120, posY) + "px"; 
+                
+                if (posX >= 250 || posY >= 120) plane.classList.add('floating');
+                
+                if (bet1Status === 'active') document.getElementById('betBtn1').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount1').value) * gameMultiplier).toFixed(2) + "</span>"; 
+                if (bet2Status === 'active') document.getElementById('betBtn2').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount2').value) * gameMultiplier).toFixed(2) + "</span>";
                 
                 if (gameMultiplier >= targetMultiplier) {
                     clearInterval(gameInterval);
                     db.ref('last_crash_point').set({ crash: targetMultiplier.toFixed(2), time: Date.now() });
-
-                    plane.classList.remove('floating'); plane.textContent = "💥"; setTimeout(() => { plane.style.display = "none"; isRoundStarted = false; if (bet1Status === 'active') { bet1Status = 'bet'; document.getElementById('betBtn1').innerHTML = "BET<span>" + document.getElementById('amount1').value + " BDT</span>"; document.getElementById('betBtn1').style.backgroundColor = "#22c55e"; } if (bet2Status === 'active') { bet2Status = 'bet'; document.getElementById('betBtn2').innerHTML = "BET<span>" + document.getElementById('amount2').value + " BDT</span>"; document.getElementById('betBtn2').style.backgroundColor = "#22c55e"; } updateHistory(targetMultiplier); multiplierText.textContent = "FLEW AWAY! " + targetMultiplier.toFixed(2) + "x"; multiplierText.classList.add('busted'); setTimeout(() => { timerContainer.style.display = "flex"; let start = Date.now(); let timer = setInterval(() => { let progress = 1 - ((Date.now() - start) / 7000); timerProgress.style.transform = "scaleX(" + Math.max(0, progress) + ")"; if (Date.now() - start >= 7000) { clearInterval(timer); startNewRound(); } }, 50); }, 3000); }, 500);
+                    plane.style.display = "none"; 
+                    isRoundStarted = false; 
+                    
+                    if (bet1Status === 'active') { bet1Status = 'bet'; document.getElementById('betBtn1').innerHTML = "BET<span>" + document.getElementById('amount1').value + " BDT</span>"; document.getElementById('betBtn1').style.backgroundColor = "#22c55e"; } 
+                    if (bet2Status === 'active') { bet2Status = 'bet'; document.getElementById('betBtn2').innerHTML = "BET<span>" + document.getElementById('amount2').value + " BDT</span>"; document.getElementById('betBtn2').style.backgroundColor = "#22c55e"; } 
+                    
+                    updateHistory(targetMultiplier); 
+                    multiplierText.textContent = "FLEW AWAY! " + targetMultiplier.toFixed(2) + "x"; 
+                    multiplierText.classList.add('busted'); 
+                    
+                    setTimeout(() => { 
+                        timerContainer.style.display = "flex"; 
+                        let start = Date.now(); 
+                        let timer = setInterval(() => { 
+                            let progress = 1 - ((Date.now() - start) / 7000); 
+                            timerProgress.style.transform = "scaleX(" + Math.max(0, progress) + ")"; 
+                            if (Date.now() - start >= 7000) { clearInterval(timer); startNewRound(); } 
+                        }, 50); 
+                    }, 3000); 
                 }
             }, 100);
         }
         switchTab('all', document.querySelector('.tab-btn'));
     </script>
 </body>
-              </html>
+</html>
