@@ -6,6 +6,21 @@
     <title>Aviator Pro Dashboard</title>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyDzX1M74cYgDj4w-ElFLdlXGYnDAz3CInE", authDomain: "my-aviator-game-5dd94.firebaseapp.com", databaseURL: "https://my-aviator-game-5dd94-default-rtdb.firebaseio.com", projectId: "my-aviator-game-5dd94", storageBucket: "my-aviator-game-5dd94.firebasestorage.app", messagingSenderId: "674926128838", appId: "1:674926128838:web:f56081adb303f84d5331c7" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const urlParams = new URLSearchParams(window.location.search);
+        const uid = urlParams.get('uid');
+        let balance = 0.00;
+        
+        if (uid) {
+            db.ref('users/' + uid + '/balance').on('value', (snap) => {
+                balance = snap.val() || 0;
+                document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT";
+            });
+        }
+    </script>
     <style>
         #loadingScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #ff3838; text-align: center; padding: 20px; box-sizing: border-box; }
         .load-logo { font-size: 50px; font-weight: 900; font-style: italic; margin-bottom: 20px; }
@@ -89,7 +104,7 @@
     </div>
     <div class="header-bar">
         <div class="logo-text">AVIATOR</div>
-        <div class="balance-text" id="balanceDisplay">10,000.00 BDT</div>
+        <div class="balance-text" id="balanceDisplay">0.00 BDT</div>
     </div>
     <div class="history-wrapper">
         <div class="history-top">
@@ -170,21 +185,10 @@
     </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyDzX1M74cYgDj4w-ElFLdlXGYnDAz3CInE", authDomain: "my-aviator-game-5dd94.firebaseapp.com", databaseURL: "https://my-aviator-game-5dd94-default-rtdb.firebaseio.com", projectId: "my-aviator-game-5dd94", storageBucket: "my-aviator-game-5dd94.firebasestorage.app", messagingSenderId: "674926128838", appId: "1:674926128838:web:f56081adb303f84d5331c7" };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
         window.onload = () => { setTimeout(() => { document.getElementById('loadBar').style.width = '100%'; }, 100); setTimeout(() => { document.getElementById('loadingScreen').style.display = 'none'; startNewRound(); }, 4100); };
         
-        let balance = 10000.00, gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet';
+        let gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet';
         
-        // ব্যালেন্স আদান-প্রদান লজিক (Parent Window)
-        window.addEventListener("message", (event) => {
-            if (event.data && event.data.type === 'updateBalance') {
-                balance = parseFloat(event.data.amount);
-                document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT";
-            }
-        });
-
         function pushPrediction(val) { db.ref('live_prediction').set({ next_crash: val.toFixed(2), status: 'ready', time: Date.now() }); }
         function switchTab(type, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); let list = document.getElementById('listData'); list.innerHTML = ""; for(let i=0; i<8; i++) { list.innerHTML += `<div class="data-row"><span>User${Math.floor(Math.random()*9999)}</span><span>${(Math.random()*1000).toFixed(0)} BDT</span><span style="color:#4caf50">${(Math.random()*5+1).toFixed(2)}x</span></div>`; } }
         function showCashOut(m, w) { let container = document.getElementById('cashOutContainer'); let div = document.createElement('div'); div.className = 'cash-out-box'; div.innerHTML = `<div class="cash-text">You have cashed out!</div><div class="win-amount">${m.toFixed(2)}x | ${w.toFixed(2)} BDT</div>`; container.appendChild(div); setTimeout(() => { div.remove(); }, 2000); }
@@ -203,25 +207,22 @@
             let is1 = (btnId === 'betBtn1'); 
             let status = is1 ? bet1Status : bet2Status; 
             if (status === 'bet') { 
-                if (balance >= amount) { 
+                if (uid && balance >= amount) { 
                     balance -= amount; 
-                    document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT"; 
-                    window.parent.postMessage({ type: 'updateBalance', amount: balance }, "*");
+                    db.ref('users/' + uid).update({ balance: balance });
                     btn.style.backgroundColor = "#ff3838"; btn.innerText = "CANCEL"; 
                     if (is1) bet1Status = 'pending'; else bet2Status = 'pending'; 
                 } 
             } else if (status === 'pending') { 
                 balance += amount; 
-                document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT";
-                window.parent.postMessage({ type: 'updateBalance', amount: balance }, "*");
+                db.ref('users/' + uid).update({ balance: balance });
                 btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
                 if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
             } else if (status === 'active') { 
                 let win = amount * gameMultiplier; 
                 balance += win; 
                 showCashOut(gameMultiplier, win); 
-                document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT"; 
-                window.parent.postMessage({ type: 'updateBalance', amount: balance }, "*");
+                db.ref('users/' + uid).update({ balance: balance });
                 btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
                 if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
             } 
@@ -285,4 +286,4 @@
         switchTab('all', document.querySelector('.tab-btn'));
     </script>
 </body>
-        </html>
+    </html>
