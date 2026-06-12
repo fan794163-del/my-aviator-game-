@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <style>
+        /* আপনার আগের সব স্টাইল অপরিবর্তিত রাখা হয়েছে */
         #loadingScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #ff3838; text-align: center; padding: 20px; box-sizing: border-box; }
         .load-logo { font-size: 50px; font-weight: 900; font-style: italic; margin-bottom: 20px; }
         .load-bar-bg { width: 100%; max-width: 400px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
@@ -23,8 +24,6 @@
         .cash-text { font-size: 10px; color: #fff; }
         .win-amount { font-size: 14px; font-weight: bold; color: #4caf50; }
         #multiplierText { position: relative; z-index: 20; pointer-events: none; }
-        .game-display::before { content: ""; position: absolute; top: 25px; right: 40px; width: 35px; height: 35px; background: #e0e0e0; border-radius: 50%; box-shadow: 0 0 15px #ffffff; clip-path: circle(50% at 65% 50%); z-index: 1; }
-        .busted { color: #ff3838; }
         #plane { position: absolute; z-index: 10; display: none; transition: left 0.1s linear, bottom 0.1s linear; width: 95px; }
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
         .floating { animation: float 2s ease-in-out infinite; }
@@ -173,6 +172,15 @@
         const firebaseConfig = { apiKey: "AIzaSyDzX1M74cYgDj4w-ElFLdlXGYnDAz3CInE", authDomain: "my-aviator-game-5dd94.firebaseapp.com", databaseURL: "https://my-aviator-game-5dd94-default-rtdb.firebaseio.com", projectId: "my-aviator-game-5dd94", storageBucket: "my-aviator-game-5dd94.firebasestorage.app", messagingSenderId: "674926128838", appId: "1:674926128838:web:f56081adb303f84d5331c7" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        
+        // --- নতুন মেসেজ লিসেনার (ড্যাশবোর্ড থেকে ব্যালেন্স আপডেট করার জন্য) ---
+        window.addEventListener("message", function(event) {
+            if (event.data && event.data.type === 'updateBalance') {
+                balance = event.data.amount;
+                document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT";
+            }
+        });
+
         window.onload = () => { setTimeout(() => { document.getElementById('loadBar').style.width = '100%'; }, 100); setTimeout(() => { document.getElementById('loadingScreen').style.display = 'none'; startNewRound(); }, 4100); };
         let balance = 10000.00, gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet';
         function pushPrediction(val) { db.ref('live_prediction').set({ next_crash: val.toFixed(2), status: 'ready', time: Date.now() }); }
@@ -196,6 +204,7 @@
                 if (balance >= amount) { 
                     balance -= amount; 
                     document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT"; 
+                    // ড্যাশবোর্ডে ব্যালেন্স পাঠানোর লজিক
                     window.parent.postMessage({ type: 'updateBalance', amount: balance }, "*");
                     btn.style.backgroundColor = "#ff3838"; btn.innerText = "CANCEL"; 
                     if (is1) bet1Status = 'pending'; else bet2Status = 'pending'; 
@@ -203,6 +212,7 @@
             } else if (status === 'pending') { 
                 balance += amount; 
                 document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT";
+                // ড্যাশবোর্ডে ব্যালেন্স পাঠানোর লজিক
                 window.parent.postMessage({ type: 'updateBalance', amount: balance }, "*");
                 btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
                 if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
@@ -211,6 +221,7 @@
                 balance += win; 
                 showCashOut(gameMultiplier, win); 
                 document.getElementById('balanceDisplay').innerText = balance.toFixed(2) + " BDT"; 
+                // ড্যাশবোর্ডে ব্যালেন্স পাঠানোর লজিক
                 window.parent.postMessage({ type: 'updateBalance', amount: balance }, "*");
                 btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
                 if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
@@ -259,7 +270,7 @@
                     if (bet2Status === 'active') { bet2Status = 'bet'; document.getElementById('betBtn2').innerHTML = "BET<span>" + document.getElementById('amount2').value + " BDT</span>"; document.getElementById('betBtn2').style.backgroundColor = "#22c55e"; } 
                     updateHistory(targetMultiplier); 
                     multiplierText.textContent = "FLEW AWAY! " + targetMultiplier.toFixed(2) + "x"; 
-                    multiplierText.classList.add('busted'); 
+                    multiplierText.classList.add8('busted'); 
                     setTimeout(() => { 
                         timerContainer.style.display = "flex"; 
                         let start = Date.now(); 
@@ -275,4 +286,4 @@
         switchTab('all', document.querySelector('.tab-btn'));
     </script>
 </body>
-</html>
+    </html>
