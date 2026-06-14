@@ -195,10 +195,17 @@
     <script>
         window.onload = () => { setTimeout(() => { document.getElementById('loadBar').style.width = '100%'; }, 100); setTimeout(() => { document.getElementById('loadingScreen').style.display = 'none'; initGameControl(); }, 4100); };
         
-        let gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet';
+        let gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet', isBetLocked = false;
         
+        // ফায়ারবেস থেকে হিস্টরি লোড করার লজিক
+        db.ref('game_history').on('value', (snap) => {
+            if (snap.exists()) {
+                historyList = snap.val();
+                updateHistoryDisplay();
+            }
+        });
+
         function initGameControl() {
-            // মাস্টার ডিভাইস হিসেবে রাউন্ড জেনারেট শুরু
             let nextCrash = 1 / (1 - Math.random());
             db.ref('game_state').set({ targetMultiplier: nextCrash.toFixed(2), status: 'starting', time: Date.now() });
         }
@@ -206,10 +213,47 @@
         function switchTab(type, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); let list = document.getElementById('listData'); list.innerHTML = ""; for(let i=0; i<8; i++) { list.innerHTML += `<div class="data-row"><span>User${Math.floor(Math.random()*9999)}</span><span>${(Math.random()*1000).toFixed(0)} BDT</span><span style="color:#4caf50">${(Math.random()*5+1).toFixed(2)}x</span></div>`; } }
         function showCashOut(m, w) { let container = document.getElementById('cashOutContainer'); let div = document.createElement('div'); div.className = 'cash-out-box'; div.innerHTML = `<div class="cash-text">You have cashed out!</div><div class="win-amount">${m.toFixed(2)}x | ${w.toFixed(2)} BDT</div>`; container.appendChild(div); setTimeout(() => { div.remove(); }, 2000); }
         function checkAutoCashOut() { if (bet1Status === 'active' && document.getElementById('autoSwitch1').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult1').value)) handleBet('betBtn1', 'amount1'); if (bet2Status === 'active' && document.getElementById('autoSwitch2').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult2').value)) handleBet('betBtn2', 'amount2'); }
-        function syncBtn(inputId, btnId) { let val = document.getElementById(inputId).value; let btn = document.getElementById(btnId); if (btn.innerText.includes("BET")) { btn.innerHTML = "BET<span>" + (parseFloat(val) || 0).toFixed(2) + " BDT</span>"; } }
+        
+        function syncBtn(inputId, btnId) { 
+            if (isBetLocked) return;
+            let val = document.getElementById(inputId).value; 
+            let btn = document.getElementById(btnId); 
+            if (btn.innerText.includes("BET")) { 
+                btn.innerHTML = "BET<span>" + (parseFloat(val) || 0).toFixed(2) + " BDT</span>"; 
+            } 
+        }
+
         function toggleHistoryModal() { let modal = document.getElementById('historyModal'); modal.style.display = (modal.style.display === 'block') ? 'none' : 'block'; }
         function toggleMode(panelId, mode) { let panel = document.getElementById(panelId); let tabs = panel.querySelectorAll('.bet-tabs span'); let auto = panel.querySelector('.auto-play-section'); tabs[0].className = (mode === 'bet') ? 'active' : ''; tabs[1].className = (mode === 'auto') ? 'active' : ''; auto.style.display = (mode === 'auto') ? 'flex' : 'none'; }
-        function updateHistory(val) { historyList.unshift(val); if (historyList.length > 30) historyList.pop(); let bar = document.getElementById('historyBar'); bar.innerHTML = ""; historyList.slice(0, 6).forEach(h => { let item = document.createElement('div'); item.className = 'h-item'; item.innerText = h + 'x'; item.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838'; bar.appendChild(item); }); let grid = document.getElementById('modalHistoryGrid'); grid.innerHTML = ""; historyList.forEach(h => { let div = document.createElement('div'); div.className = 'modal-item'; div.innerText = h + 'x'; div.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838'; grid.appendChild(div); }); }
+        
+        // হিস্টরি আপডেট এবং ফায়ারবেসে সেভ করার লজিক
+        function updateHistory(val) {
+            historyList.unshift(val);
+            if (historyList.length > 30) historyList.pop();
+            db.ref('game_history').set(historyList);
+        }
+
+        function updateHistoryDisplay() {
+            let bar = document.getElementById('historyBar');
+            bar.innerHTML = "";
+            historyList.slice(0, 6).forEach(h => {
+                let item = document.createElement('div');
+                item.className = 'h-item';
+                item.innerText = h + 'x';
+                item.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
+                bar.appendChild(item);
+            });
+            let grid = document.getElementById('modalHistoryGrid');
+            grid.innerHTML = "";
+            historyList.forEach(h => {
+                let div = document.createElement('div');
+                div.className = 'modal-item';
+                div.innerText = h + 'x';
+                div.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
+                grid.appendChild(div);
+            });
+        }
+
         function updateVal(id, val) { let input = document.getElementById(id); let newVal = parseFloat(input.value) + val; if(newVal >= 0) { input.value = newVal.toFixed(2); syncBtn(id, (id === 'amount1') ? 'betBtn1' : 'betBtn2'); } }
         function setVal(id, val) { document.getElementById(id).value = val.toFixed(2); syncBtn(id, (id === 'amount1') ? 'betBtn1' : 'betBtn2'); }
         
@@ -241,6 +285,7 @@
         }
         
         function startNewRound(targetMultiplier) {
+            isBetLocked = true;
             let plane = document.getElementById('plane'); 
             let multiplierText = document.getElementById('multiplierText'); 
             plane.classList.remove('floating'); 
@@ -276,6 +321,7 @@
                 
                 if (gameMultiplier >= targetMultiplier) {
                     clearInterval(gameInterval);
+                    isBetLocked = false;
                     plane.style.display = "none"; 
                     isRoundStarted = false; 
                     
@@ -286,35 +332,22 @@
                     multiplierText.textContent = "FLEW AWAY! " + targetMultiplier.toFixed(2) + "x"; 
                     multiplierText.classList.add('busted'); 
 
-                    // --- এখানে নতুন পরিবর্তনটি বসান ---
-                    
-                    // ১. রাউন্ড শেষ হওয়ার সাথে সাথেই পরের রেজাল্ট জেনারেট করুন
                     let next = (1 / (1 - Math.random())).toFixed(2);
-                    db.ref('game_state').update({ 
-                        targetMultiplier: next, 
-                        status: 'waiting' // প্রেডিকশন টুলের জন্য ওয়েটিং স্ট্যাটাস
-                    });
+                    db.ref('game_state').update({ targetMultiplier: next, status: 'waiting' });
 
-                    // ২. ৩ সেকেন্ড বিরতি দিয়ে টাইমার দেখান
                     setTimeout(() => { 
                         timerContainer.style.display = "flex"; 
                         let start = Date.now(); 
                         let timer = setInterval(() => { 
                             let progress = 1 - ((Date.now() - start) / 7000); 
                             timerProgress.style.transform = "scaleX(" + Math.max(0, progress) + ")"; 
-                            if (Date.now() - start >= 7000) { 
-                                clearInterval(timer); 
-                                // ৭ সেকেন্ড পর গেম শুরু হবে
+                            if (Date.now() - start >= 7000) { clearInterval(timer); 
                                 db.ref('game_state').update({ status: 'starting' });
                             } 
                         }, 50); 
                     }, 3000); 
-
-                    // ---------------------------------
                 }
             }, 100);
         }
         switchTab('all', document.querySelector('.tab-btn'));
-    </script>
-</body>
-    </html>
+                        </script>
