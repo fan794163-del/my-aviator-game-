@@ -193,161 +193,177 @@
     </div>
 
     <script>
-        window.onload = () => { setTimeout(() => { document.getElementById('loadBar').style.width = '100%'; }, 100); setTimeout(() => { document.getElementById('loadingScreen').style.display = 'none'; initGameControl(); }, 4100); };
+    window.onload = () => { setTimeout(() => { document.getElementById('loadBar').style.width = '100%'; }, 100); setTimeout(() => { document.getElementById('loadingScreen').style.display = 'none'; initGameControl(); }, 4100); };
+    
+    let gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet', isBetLocked = false;
+    
+    db.ref('game_history').on('value', (snap) => {
+        if (snap.exists()) {
+            historyList = snap.val();
+            updateHistoryDisplay();
+        }
+    });
+
+    // নতুন লজিক: বাটন বাদে বাকি প্যানেল এলিমেন্ট লক করার ফাংশন
+    function setPanelLock(isLocked) {
+        // প্যানেলের ভেতরের সব ইনপুট, বাটন, ট্যাব এবং শর্টকাট এলিমেন্ট সিলেক্ট করা
+        // আপনার স্ক্রিনশট অনুযায়ী প্যানেলের ভেতরের সব কন্টেইনার ধরে লজিক প্রয়োগ করা হয়েছে
+        const elements = document.querySelectorAll('input, button, .tab-btn, .shortcut-btn, .amount-btn');
         
-        let gameMultiplier = 1.00, gameInterval = null, historyList = [], isRoundStarted = false, bet1Status = 'bet', bet2Status = 'bet', isBetLocked = false;
-        
-        // ফায়ারবেস থেকে হিস্টরি লোড করার লজিক
-        db.ref('game_history').on('value', (snap) => {
-            if (snap.exists()) {
-                historyList = snap.val();
-                updateHistoryDisplay();
+        elements.forEach(el => {
+            // বেট বাটন বাদে বাকি সবকিছু লক করা হচ্ছে
+            if (el.id !== 'betBtn1' && el.id !== 'betBtn2') {
+                el.style.pointerEvents = isLocked ? 'none' : 'auto';
+                el.style.opacity = isLocked ? '0.6' : '1';
+                if (el.tagName === 'INPUT') el.readOnly = isLocked;
             }
         });
+    }
 
-        function initGameControl() {
-            let nextCrash = 1 / (1 - Math.random());
-            db.ref('game_state').set({ targetMultiplier: nextCrash.toFixed(2), status: 'starting', time: Date.now() });
-        }
+    function initGameControl() {
+        let nextCrash = 1 / (1 - Math.random());
+        db.ref('game_state').set({ targetMultiplier: nextCrash.toFixed(2), status: 'starting', time: Date.now() });
+    }
 
-        function switchTab(type, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); let list = document.getElementById('listData'); list.innerHTML = ""; for(let i=0; i<8; i++) { list.innerHTML += `<div class="data-row"><span>User${Math.floor(Math.random()*9999)}</span><span>${(Math.random()*1000).toFixed(0)} BDT</span><span style="color:#4caf50">${(Math.random()*5+1).toFixed(2)}x</span></div>`; } }
-        function showCashOut(m, w) { let container = document.getElementById('cashOutContainer'); let div = document.createElement('div'); div.className = 'cash-out-box'; div.innerHTML = `<div class="cash-text">You have cashed out!</div><div class="win-amount">${m.toFixed(2)}x | ${w.toFixed(2)} BDT</div>`; container.appendChild(div); setTimeout(() => { div.remove(); }, 2000); }
-        function checkAutoCashOut() { if (bet1Status === 'active' && document.getElementById('autoSwitch1').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult1').value)) handleBet('betBtn1', 'amount1'); if (bet2Status === 'active' && document.getElementById('autoSwitch2').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult2').value)) handleBet('betBtn2', 'amount2'); }
-        
-        function syncBtn(inputId, btnId) { 
-            if (isBetLocked) return;
-            let val = document.getElementById(inputId).value; 
-            let btn = document.getElementById(btnId); 
-            if (btn.innerText.includes("BET")) { 
-                btn.innerHTML = "BET<span>" + (parseFloat(val) || 0).toFixed(2) + " BDT</span>"; 
-            } 
-        }
+    function switchTab(type, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); let list = document.getElementById('listData'); list.innerHTML = ""; for(let i=0; i<8; i++) { list.innerHTML += `<div class="data-row"><span>User${Math.floor(Math.random()*9999)}</span><span>${(Math.random()*1000).toFixed(0)} BDT</span><span style="color:#4caf50">${(Math.random()*5+1).toFixed(2)}x</span></div>`; } }
+    function showCashOut(m, w) { let container = document.getElementById('cashOutContainer'); let div = document.createElement('div'); div.className = 'cash-out-box'; div.innerHTML = `<div class="cash-text">You have cashed out!</div><div class="win-amount">${m.toFixed(2)}x | ${w.toFixed(2)} BDT</div>`; container.appendChild(div); setTimeout(() => { div.remove(); }, 2000); }
+    function checkAutoCashOut() { if (bet1Status === 'active' && document.getElementById('autoSwitch1').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult1').value)) handleBet('betBtn1', 'amount1'); if (bet2Status === 'active' && document.getElementById('autoSwitch2').checked && gameMultiplier >= parseFloat(document.getElementById('autoMult2').value)) handleBet('betBtn2', 'amount2'); }
+    
+    function syncBtn(inputId, btnId) { 
+        if (isBetLocked) return;
+        let val = document.getElementById(inputId).value; 
+        let btn = document.getElementById(btnId); 
+        if (btn.innerText.includes("BET")) { 
+            btn.innerHTML = "BET<span>" + (parseFloat(val) || 0).toFixed(2) + " BDT</span>"; 
+        } 
+    }
 
-        function toggleHistoryModal() { let modal = document.getElementById('historyModal'); modal.style.display = (modal.style.display === 'block') ? 'none' : 'block'; }
-        function toggleMode(panelId, mode) { let panel = document.getElementById(panelId); let tabs = panel.querySelectorAll('.bet-tabs span'); let auto = panel.querySelector('.auto-play-section'); tabs[0].className = (mode === 'bet') ? 'active' : ''; tabs[1].className = (mode === 'auto') ? 'active' : ''; auto.style.display = (mode === 'auto') ? 'flex' : 'none'; }
-        
-        // হিস্টরি আপডেট এবং ফায়ারবেসে সেভ করার লজিক
-        function updateHistory(val) {
-            historyList.unshift(val);
-            if (historyList.length > 30) historyList.pop();
-            db.ref('game_history').set(historyList);
-        }
+    function toggleHistoryModal() { let modal = document.getElementById('historyModal'); modal.style.display = (modal.style.display === 'block') ? 'none' : 'block'; }
+    function toggleMode(panelId, mode) { let panel = document.getElementById(panelId); let tabs = panel.querySelectorAll('.bet-tabs span'); let auto = panel.querySelector('.auto-play-section'); tabs[0].className = (mode === 'bet') ? 'active' : ''; tabs[1].className = (mode === 'auto') ? 'active' : ''; auto.style.display = (mode === 'auto') ? 'flex' : 'none'; }
+    
+    function updateHistory(val) {
+        historyList.unshift(val);
+        if (historyList.length > 30) historyList.pop();
+        db.ref('game_history').set(historyList);
+    }
 
-        function updateHistoryDisplay() {
-            let bar = document.getElementById('historyBar');
-            bar.innerHTML = "";
-            historyList.slice(0, 6).forEach(h => {
-                let item = document.createElement('div');
-                item.className = 'h-item';
-                item.innerText = h + 'x';
-                item.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
-                bar.appendChild(item);
-            });
-            let grid = document.getElementById('modalHistoryGrid');
-            grid.innerHTML = "";
-            historyList.forEach(h => {
-                let div = document.createElement('div');
-                div.className = 'modal-item';
-                div.innerText = h + 'x';
-                div.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
-                grid.appendChild(div);
-            });
-        }
+    function updateHistoryDisplay() {
+        let bar = document.getElementById('historyBar');
+        bar.innerHTML = "";
+        historyList.slice(0, 6).forEach(h => {
+            let item = document.createElement('div');
+            item.className = 'h-item';
+            item.innerText = h + 'x';
+            item.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
+            bar.appendChild(item);
+        });
+        let grid = document.getElementById('modalHistoryGrid');
+        grid.innerHTML = "";
+        historyList.forEach(h => {
+            let div = document.createElement('div');
+            div.className = 'modal-item';
+            div.innerText = h + 'x';
+            div.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
+            grid.appendChild(div);
+        });
+    }
 
-        function updateVal(id, val) { let input = document.getElementById(id); let newVal = parseFloat(input.value) + val; if(newVal >= 0) { input.value = newVal.toFixed(2); syncBtn(id, (id === 'amount1') ? 'betBtn1' : 'betBtn2'); } }
-        function setVal(id, val) { document.getElementById(id).value = val.toFixed(2); syncBtn(id, (id === 'amount1') ? 'betBtn1' : 'betBtn2'); }
-        
-        function handleBet(btnId, amountId) { 
-            let btn = document.getElementById(btnId); 
-            let amount = parseFloat(document.getElementById(amountId).value); 
-            let is1 = (btnId === 'betBtn1'); 
-            let status = is1 ? bet1Status : bet2Status; 
-            if (status === 'bet') { 
-                if (uid && balance >= amount) { 
-                    balance -= amount; 
-                    db.ref('users/' + uid).update({ balance: balance });
-                    btn.style.backgroundColor = "#ff3838"; btn.innerText = "CANCEL"; 
-                    if (is1) bet1Status = 'pending'; else bet2Status = 'pending'; 
-                } 
-            } else if (status === 'pending') { 
-                balance += amount; 
+    function updateVal(id, val) { let input = document.getElementById(id); let newVal = parseFloat(input.value) + val; if(newVal >= 0) { input.value = newVal.toFixed(2); syncBtn(id, (id === 'amount1') ? 'betBtn1' : 'betBtn2'); } }
+    function setVal(id, val) { document.getElementById(id).value = val.toFixed(2); syncBtn(id, (id === 'amount1') ? 'betBtn1' : 'betBtn2'); }
+    
+    function handleBet(btnId, amountId) { 
+        let btn = document.getElementById(btnId); 
+        let amount = parseFloat(document.getElementById(amountId).value); 
+        let is1 = (btnId === 'betBtn1'); 
+        let status = is1 ? bet1Status : bet2Status; 
+        if (status === 'bet') { 
+            if (uid && balance >= amount) { 
+                balance -= amount; 
                 db.ref('users/' + uid).update({ balance: balance });
-                btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
-                if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
-            } else if (status === 'active') { 
-                let win = amount * gameMultiplier; 
-                balance += win; 
-                showCashOut(gameMultiplier, win); 
-                db.ref('users/' + uid).update({ balance: balance });
-                btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
-                if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
+                btn.style.backgroundColor = "#ff3838"; btn.innerText = "CANCEL"; 
+                if (is1) bet1Status = 'pending'; else bet2Status = 'pending'; 
             } 
-        }
+        } else if (status === 'pending') { 
+            balance += amount; 
+            db.ref('users/' + uid).update({ balance: balance });
+            btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
+            if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
+        } else if (status === 'active') { 
+            let win = amount * gameMultiplier; 
+            balance += win; 
+            showCashOut(gameMultiplier, win); 
+            db.ref('users/' + uid).update({ balance: balance });
+            btn.style.backgroundColor = "#22c55e"; btn.innerHTML = "BET<span>" + amount.toFixed(2) + " BDT</span>"; 
+            if (is1) bet1Status = 'bet'; else bet2Status = 'bet'; 
+        } 
+    }
+    
+    function startNewRound(targetMultiplier) {
+        setPanelLock(true); // রাউন্ড শুরু: সব লক (বাটন বাদে)
+        isBetLocked = true;
+        let plane = document.getElementById('plane'); 
+        let multiplierText = document.getElementById('multiplierText'); 
+        plane.classList.remove('floating'); 
+        plane.style.display = "block"; 
+        let posX = 10, posY = 10; 
+        plane.style.left = posX + "px"; 
+        plane.style.bottom = posY + "px"; 
+        let velX = 0.5, velY = 0.2, accel = 0.15; 
+        isRoundStarted = true; 
+        if (bet1Status === 'pending') { bet1Status = 'active'; document.getElementById('betBtn1').innerText = "CASH OUT"; document.getElementById('betBtn1').style.backgroundColor = "#eab92d"; } 
+        if (bet2Status === 'pending') { bet2Status = 'active'; document.getElementById('betBtn2').innerText = "CASH OUT"; document.getElementById('betBtn2').style.backgroundColor = "#eab92d"; }
+        let timerContainer = document.getElementById('timerContainer'); 
+        let timerProgress = document.getElementById('timerProgress'); 
+        multiplierText.textContent = "1.00x"; 
+        multiplierText.classList.remove('busted'); 
+        timerContainer.style.display = "none"; 
+        gameMultiplier = 1.00;
         
-        function startNewRound(targetMultiplier) {
-            isBetLocked = true;
-            let plane = document.getElementById('plane'); 
-            let multiplierText = document.getElementById('multiplierText'); 
-            plane.classList.remove('floating'); 
-            plane.style.display = "block"; 
-            let posX = 10, posY = 10; 
-            plane.style.left = posX + "px"; 
-            plane.style.bottom = posY + "px"; 
-            let velX = 0.5, velY = 0.2, accel = 0.15; 
-            isRoundStarted = true; 
-            if (bet1Status === 'pending') { bet1Status = 'active'; document.getElementById('betBtn1').innerText = "CASH OUT"; document.getElementById('betBtn1').style.backgroundColor = "#eab92d"; } 
-            if (bet2Status === 'pending') { bet2Status = 'active'; document.getElementById('betBtn2').innerText = "CASH OUT"; document.getElementById('betBtn2').style.backgroundColor = "#eab92d"; }
-            let timerContainer = document.getElementById('timerContainer'); 
-            let timerProgress = document.getElementById('timerProgress'); 
-            multiplierText.textContent = "1.00x"; 
-            multiplierText.classList.remove('busted'); 
-            timerContainer.style.display = "none"; 
-            gameMultiplier = 1.00;
+        clearInterval(gameInterval);
+        gameInterval = setInterval(() => {
+            gameMultiplier += (gameMultiplier < 4) ? 0.01 : 0.03; 
+            multiplierText.textContent = gameMultiplier.toFixed(2) + "x"; 
+            checkAutoCashOut(); 
+            velX += accel * 0.1; 
+            velY += accel * 0.05; 
+            posX += velX; 
+            posY += velY; 
+            plane.style.left = Math.min(250, posX) + "px"; 
+            plane.style.bottom = Math.min(120, posY) + "px"; 
+            if (posX >= 250 || posY >= 120) plane.classList.add('floating');
+            if (bet1Status === 'active') document.getElementById('betBtn1').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount1').value) * gameMultiplier).toFixed(2) + "</span>"; 
+            if (bet2Status === 'active') document.getElementById('betBtn2').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount2').value) * gameMultiplier).toFixed(2) + "</span>";
             
-            clearInterval(gameInterval);
-            gameInterval = setInterval(() => {
-                gameMultiplier += (gameMultiplier < 4) ? 0.01 : 0.03; 
-                multiplierText.textContent = gameMultiplier.toFixed(2) + "x"; 
-                checkAutoCashOut(); 
-                velX += accel * 0.1; 
-                velY += accel * 0.05; 
-                posX += velX; 
-                posY += velY; 
-                plane.style.left = Math.min(250, posX) + "px"; 
-                plane.style.bottom = Math.min(120, posY) + "px"; 
-                if (posX >= 250 || posY >= 120) plane.classList.add('floating');
-                if (bet1Status === 'active') document.getElementById('betBtn1').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount1').value) * gameMultiplier).toFixed(2) + "</span>"; 
-                if (bet2Status === 'active') document.getElementById('betBtn2').innerHTML = "CASH OUT<span>" + (parseFloat(document.getElementById('amount2').value) * gameMultiplier).toFixed(2) + "</span>";
+            if (gameMultiplier >= targetMultiplier) {
+                clearInterval(gameInterval);
+                setPanelLock(false); // রাউন্ড শেষ: সব আনলক
+                isBetLocked = false;
+                plane.style.display = "none"; 
+                isRoundStarted = false; 
                 
-                if (gameMultiplier >= targetMultiplier) {
-                    clearInterval(gameInterval);
-                    isBetLocked = false;
-                    plane.style.display = "none"; 
-                    isRoundStarted = false; 
-                    
-                    if (bet1Status === 'active') { bet1Status = 'bet'; document.getElementById('betBtn1').innerHTML = "BET<span>" + document.getElementById('amount1').value + " BDT</span>"; document.getElementById('betBtn1').style.backgroundColor = "#22c55e"; } 
-                    if (bet2Status === 'active') { bet2Status = 'bet'; document.getElementById('betBtn2').innerHTML = "BET<span>" + document.getElementById('amount2').value + " BDT</span>"; document.getElementById('betBtn2').style.backgroundColor = "#22c55e"; } 
-                    
-                    updateHistory(targetMultiplier.toFixed(2)); 
-                    multiplierText.textContent = "FLEW AWAY! " + targetMultiplier.toFixed(2) + "x"; 
-                    multiplierText.classList.add('busted'); 
+                if (bet1Status === 'active') { bet1Status = 'bet'; document.getElementById('betBtn1').innerHTML = "BET<span>" + document.getElementById('amount1').value + " BDT</span>"; document.getElementById('betBtn1').style.backgroundColor = "#22c55e"; } 
+                if (bet2Status === 'active') { bet2Status = 'bet'; document.getElementById('betBtn2').innerHTML = "BET<span>" + document.getElementById('amount2').value + " BDT</span>"; document.getElementById('betBtn2').style.backgroundColor = "#22c55e"; } 
+                
+                updateHistory(targetMultiplier.toFixed(2)); 
+                multiplierText.textContent = "FLEW AWAY! " + targetMultiplier.toFixed(2) + "x"; 
+                multiplierText.classList.add('busted'); 
 
-                    let next = (1 / (1 - Math.random())).toFixed(2);
-                    db.ref('game_state').update({ targetMultiplier: next, status: 'waiting' });
+                let next = (1 / (1 - Math.random())).toFixed(2);
+                db.ref('game_state').update({ targetMultiplier: next, status: 'waiting' });
 
-                    setTimeout(() => { 
-                        timerContainer.style.display = "flex"; 
-                        let start = Date.now(); 
-                        let timer = setInterval(() => { 
-                            let progress = 1 - ((Date.now() - start) / 7000); 
-                            timerProgress.style.transform = "scaleX(" + Math.max(0, progress) + ")"; 
-                            if (Date.now() - start >= 7000) { clearInterval(timer); 
-                                db.ref('game_state').update({ status: 'starting' });
-                            } 
-                        }, 50); 
-                    }, 3000); 
-                }
-            }, 100);
-        }
-        switchTab('all', document.querySelector('.tab-btn'));
+                setTimeout(() => { 
+                    timerContainer.style.display = "flex"; 
+                    let start = Date.now(); 
+                    let timer = setInterval(() => { 
+                        let progress = 1 - ((Date.now() - start) / 7000); 
+                        timerProgress.style.transform = "scaleX(" + Math.max(0, progress) + ")"; 
+                        if (Date.now() - start >= 7000) { clearInterval(timer); 
+                            db.ref('game_state').update({ status: 'starting' });
+                        } 
+                    }, 50); 
+                }, 3000); 
+            }
+        }, 100);
+    }
+    switchTab('all', document.querySelector('.tab-btn'));
                         </script>
