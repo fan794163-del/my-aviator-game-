@@ -258,22 +258,34 @@
     }
 
     function updateHistoryDisplay() {
+        // কালার নির্ধারণ করার লজিক (আপনার ছবি অনুযায়ী)
+        function getMultiplierColor(val) {
+            if (val >= 1.00 && val < 2.00) return "#4db6e5"; // নীল
+            if (val >= 2.00 && val < 10.00) return "#c77dff"; // বেগুনী
+            return "#ff69b4"; // ১০ এর উপরে হলে গোলাপী
+        }
+
         let bar = document.getElementById('historyBar');
         bar.innerHTML = "";
         historyList.slice(0, 6).forEach(h => {
+            let val = parseFloat(h);
             let item = document.createElement('div');
             item.className = 'h-item';
             item.innerText = h + 'x';
-            item.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
+            item.style.backgroundColor = "#242833";
+            item.style.color = getMultiplierColor(val);
             bar.appendChild(item);
         });
+        
         let grid = document.getElementById('modalHistoryGrid');
         grid.innerHTML = "";
         historyList.forEach(h => {
+            let val = parseFloat(h);
             let div = document.createElement('div');
             div.className = 'modal-item';
             div.innerText = h + 'x';
-            div.style.color = (parseFloat(h) >= 2.0) ? '#4caf50' : '#ff3838';
+            div.style.backgroundColor = "#242833";
+            div.style.color = getMultiplierColor(val);
             grid.appendChild(div);
         });
     }
